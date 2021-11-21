@@ -65,7 +65,6 @@ void loadMap() {
 
 	width = WIDTH;
 	height = HEIGHT;
-	// map = (bool*)malloc(width * height * sizeof(bool));
 	walls = new bool[width * height]{};
 	coins = new bool[width * height]{};
 
@@ -90,8 +89,8 @@ void printMap() {
 
 	for(int y = 0; y < height; y++) {
 		for(int x = 0; x < width; x++) {
-			if(x == pacPosX && y == pacPosY) {
-				// printf("\x1B[33m" "C " "\x1B[0m"); // Pac Man
+			if(x == pacPosX && y == pacPosY) { // Pac Man
+				// printf("\x1B[33m" "C " "\x1B[0m");
 				printf("\x1B[33m"); // Gelb
 				if(frame%2 == 0) {
 					printf("O ");
@@ -105,16 +104,16 @@ void printMap() {
 					if(pacDirY == -1)
 						printf("V ");
 				}
-				printf("\x1B[0m"); // Pac Man
+				printf("\x1B[0m");
 			} else if(walls[y * width + x]) {
 				printf("\x1B[32m" "WW" "\x1B[0m"); // Wand
 			} else if(coins[y * width + x]) {
 				printf("\x1B[33m"); // Gelb
 				printf(". "); // Coin
+				printf("\x1B[0m");
 			} else {
 				printf("  "); // Leer
 			}
-			// coins[y * width + x];
 		}
 		printf("\n");
 	}
@@ -161,8 +160,6 @@ void update() {
 
 int main(int argc, char** argv) {
 	loadMap();
-
-	return 0;
 
 	for(;;) {
 		update();
