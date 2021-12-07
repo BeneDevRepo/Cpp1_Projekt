@@ -1,13 +1,19 @@
 #include <iostream>
 #include <cstdint>
 
-// Windows
-#include <windows.h>
-#include <conio.h>
+#include <vector>
+
+#include "platform.h"
 
 // void flushInput() {
 // 	for(;;) { const int c = getchar(); if(c=='\n' || c==EOF) break; }
 // }
+
+struct Ghost {
+	int x, y; // position des Geistes
+	int dirX, dirY; // richtung
+};
+
 
 uint16_t WIDTH = 28;
 uint16_t HEIGHT = 31;
@@ -54,6 +60,9 @@ bool *coins = nullptr; // true = Muenze
 
 int pacPosX, pacPosY;
 int pacDirX, pacDirY;
+
+const int NUM_GHOSTS = 1;
+Ghost ghosts[NUM_GHOSTS]; // blinky
 // /Spielstatus
 
 void loadMap() {
@@ -61,7 +70,13 @@ void loadMap() {
 	pacPosY = 23;
 
 	pacDirX = 0;
-	pacDirY = 0;
+	pacDirY = -1;
+
+	ghosts[0].x = 13;
+	ghosts[0].y = 11;
+	ghosts[0].dirX = 0;
+	ghosts[0].dirY = 0;
+
 
 	width = WIDTH;
 	height = HEIGHT;
@@ -85,7 +100,7 @@ void printMap() {
 	frame++;
 	printf("\x1B[?25l"); // Disable Cursor
 	printf("\x1B[0;0H"); // Cursor pos <y=0; x=0>
-	printf("\x1B[2J"); // Erase Entire Viewport
+	// printf("\x1B[2J"); // Erase Entire Viewport
 
 	for(int y = 0; y < height; y++) {
 		for(int x = 0; x < width; x++) {
@@ -93,20 +108,25 @@ void printMap() {
 				// printf("\x1B[33m" "C " "\x1B[0m");
 				printf("\x1B[33m"); // Gelb
 				if(frame%2 == 0) {
-					printf("O ");
+					printf("o ");
 				} else {
 					if(pacDirX == 1)
 						printf("< ");
-					if(pacDirX == -1)
+					else if(pacDirX == -1)
 						printf("> ");
-					if(pacDirY == 1)
+					else if(pacDirY == 1)
 						printf("^ ");
-					if(pacDirY == -1)
+					else if(pacDirY == -1)
 						printf("V ");
 				}
 				printf("\x1B[0m");
+			} else if(x == ghosts[0].x && y == ghosts[0].y) {
+				printf("\x1B[31m"); // Rot
+				printf("U "); // Geist
+				printf("\x1B[0m");
 			} else if(walls[y * width + x]) {
-				printf("\x1B[32m" "WW" "\x1B[0m"); // Wand
+				// printf("\x1B[34m" "WW" "\x1B[0m"); // Wand
+				printf("\x1B[36m" "WW" "\x1B[0m"); // Wand
 			} else if(coins[y * width + x]) {
 				printf("\x1B[33m"); // Gelb
 				printf(". "); // Coin
@@ -118,12 +138,86 @@ void printMap() {
 		printf("\n");
 	}
 
-	printf("\nScore: %d\n", score);
+	printf("\x1B[35m" "\nScore: %d\n" "\x1B[0m", score);
+}
+
+void updateGhosts() {
+	int *distMap = new int[width * height]{};
+
+	struct Pos {
+		int x, y;
+	};
+
+	int currentDist = 0; // Distanz von der Zierposition
+	std::vector<Pos> lastSet; // zuletzt ausgefuellte Felder
+
+	lastSet.push_back({pacPosX, pacPosY});
+
+
+	for(;;) {
+		std::vector<Pos> newLastSet;
+
+		for(int i=0; i < lastSet.size(); i++) {
+			if(walls[lastSet[i].y * width + lastSet[i].x-1] == false && distMap[lastSet[i].y * width + lastSet[i].x-1] == 0) { // Keine Wand links
+				distMap[lastSet[i].y * width + lastSet[i].x-1] = currentDist;
+				newLastSet.push_back({lastSet[i].x-1, lastSet[i].y});
+			}
+			if(walls[lastSet[i].y * width + lastSet[i].x+1] == false && distMap[lastSet[i].y * width + lastSet[i].x+1] == 0) { // Keine Wand rechts
+				distMap[lastSet[i].y * width + lastSet[i].x+1] = currentDist;
+				newLastSet.push_back({lastSet[i].x+1, lastSet[i].y});
+			}
+			if(walls[(lastSet[i].y-1) * width + lastSet[i].x] == false && distMap[(lastSet[i].y-1) * width + lastSet[i].x] == 0) { // Keine Wand oben
+				distMap[(lastSet[i].y-1) * width + lastSet[i].x] = currentDist;
+				newLastSet.push_back({lastSet[i].x, lastSet[i].y-1});
+			}
+			if(walls[(lastSet[i].y+1) * width + lastSet[i].x] == false && distMap[(lastSet[i].y+1) * width + lastSet[i].x] == 0) { // Keine Wand unten
+				distMap[(lastSet[i].y+1) * width + lastSet[i].x] = currentDist;
+				newLastSet.push_back({lastSet[i].x, lastSet[i].y+1});
+			}
+		}
+
+		currentDist++;
+
+		if(newLastSet.size() == 0)
+			break;
+
+		lastSet = newLastSet;
+	}
+
+	{
+		int minDist = 1000000;
+
+		if(distMap[ghosts[0].y * width + ghosts[0].x-1] < minDist && walls[ghosts[0].y * width + ghosts[0].x-1] == false) {
+			minDist = distMap[ghosts[0].y * width + ghosts[0].x-1];
+			ghosts[0].dirX = -1;
+			ghosts[0].dirY = 0;
+		}
+		if(distMap[ghosts[0].y * width + ghosts[0].x+1] < minDist && walls[ghosts[0].y * width + ghosts[0].x+1] == false) {
+			minDist = distMap[ghosts[0].y * width + ghosts[0].x+1];
+			ghosts[0].dirX = 1;
+			ghosts[0].dirY = 0;
+		}
+		if(distMap[(ghosts[0].y-1) * width + ghosts[0].x] < minDist && walls[(ghosts[0].y-1) * width + ghosts[0].x] == false) {
+			minDist = distMap[(ghosts[0].y-1) * width + ghosts[0].x];
+			ghosts[0].dirX = 0;
+			ghosts[0].dirY = -1;
+		}
+		if(distMap[(ghosts[0].y+1) * width + ghosts[0].x] < minDist && walls[(ghosts[0].y+1) * width + ghosts[0].x] == false) {
+			minDist = distMap[(ghosts[0].y+1) * width + ghosts[0].x];
+			ghosts[0].dirX = 0;
+			ghosts[0].dirY = 1;
+		}
+	}
+
+	ghosts[0].x += ghosts[0].dirX;
+	ghosts[0].y += ghosts[0].dirY;
+
+	delete[] distMap;
 }
 
 void update() {
-	if(_kbhit()) { // Wenn Taste gedrueckt
-		char input = _getch(); // Die gedrückte Taste
+	if(Platform::kbPressed()) { // Wenn Taste gedrueckt
+		char input = Platform::getPressedKey(); // Die gedrückte Taste
 		if(input == 'w') {
 			pacDirX = 0;
 			pacDirY = -1;
@@ -156,15 +250,22 @@ void update() {
 			score++;
 		}
 	}
+
+	static int tick = 0;
+	if(tick++ % 8 != 0)
+		updateGhosts();
 }
 
 int main(int argc, char** argv) {
+	Platform::configTerminal();
+
 	loadMap();
 
 	for(;;) {
 		update();
 		printMap();
-		Sleep(100);
+		// Sleep(100);
+		Platform::sleepMS(100);
 	}
 
 	printf("\x1B[31m" "Hello World!\n" "\x1B[0m");
