@@ -153,7 +153,6 @@ void updateGhosts() {
 
 	lastSet.push_back({pacPosX, pacPosY});
 
-
 	for(;;) {
 		std::vector<Pos> newLastSet;
 
