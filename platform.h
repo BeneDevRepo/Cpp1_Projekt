@@ -15,6 +15,14 @@
 #endif
 
 namespace Platform {
+	#if _WIN32
+	constexpr const char *const HEART = "\x03";
+	#endif
+
+	#if __linux__
+	constexpr const char *const HEART = "♥";
+	#endif
+
 	void configTerminal() {
 		#if _WIN32
 			CONSOLE_CURSOR_INFO cursorInfo;
