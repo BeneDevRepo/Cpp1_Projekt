@@ -197,7 +197,7 @@ void printMap() {
 	printf("\x1B[31m"); // Rot
 	for(int i = 0; i < leben; i++)
 		printf("%s ", Platform::HEART);
-	printf("      ");
+	printf("      \n");
 	printf("\x1B[0m");
 }
 
