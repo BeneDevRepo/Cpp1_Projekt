@@ -17,6 +17,11 @@
 namespace Platform {
 	void configTerminal() {
 		#if _WIN32
+			CONSOLE_CURSOR_INFO cursorInfo;
+			cursorInfo.dwSize = 1;
+			cursorInfo.bVisible = FALSE; // disable cursor
+			SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cursorInfo);
+
 			// HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE); 
 			// DWORD mode = 0;
 			// GetConsoleMode(hStdin, &mode);
@@ -27,7 +32,7 @@ namespace Platform {
 			termios terminalState;
 			tcgetattr(STDIN_FILENO, &terminalState); //get the terminal state
 
-			terminalState.c_lflag &= ~ICANON; // turn off canonical (buffered i/o) mode (Input buffer accessible in real time; no enter required)
+			terminalState.c_lflag &= ~ICANON; // Disable canonical (buffered i/o) mode (Input buffer accessible in real time; no enter required)
 			terminalState.c_lflag &= ~ECHO; // Disable echo mode
 
 			tcsetattr(STDIN_FILENO, TCSANOW, &terminalState);//set the terminal attributes.
