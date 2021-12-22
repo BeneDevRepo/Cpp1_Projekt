@@ -62,7 +62,7 @@ namespace Platform {
 		#endif
 	}
 
-	char getPressedKey() { // Gedrueckte Taste aus input-buffer auslesen
+	int getPressedKey() { // Gedrueckte Taste aus input-buffer auslesen
 		#if _WIN32
 			return _getch();
 		#endif

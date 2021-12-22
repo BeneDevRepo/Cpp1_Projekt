@@ -24,7 +24,7 @@ struct Ghost {
 	vec2 dir; // richtung
 };
 
-enum class State { START_SCREEN, GAME, ENDSCREEN };
+enum class State { START_SCREEN, MENU, HELPPAGE, GAME, ENDSCREEN };
 State state = State::START_SCREEN;
 
 namespace testMap {
@@ -66,6 +66,8 @@ namespace testMap {
 };
 
 // Spielstatus:
+int level;
+
 int MAX_SCORE = 0;
 int score = 0;
 
@@ -97,6 +99,9 @@ void loadStartPositions() {
 
 	ghosts[2].x = 13;
 	ghosts[2].y = 13;
+
+	ghosts[3].x = 14;
+	ghosts[3].y = 13;
 
 	// ghosts[3].x = 13;
 	// ghosts[3].y = 11;
@@ -139,6 +144,8 @@ void printMap() {
 	printf("\x1B[0;0H"); // Cursor pos <y=0; x=0>
 	// printf("\x1B[2J"); // Erase Entire Viewport
 
+	printf("Level %d\n\n", level + 1);
+
 	for(int y = 0; y < height; y++) {
 		for(int x = 0; x < width; x++) {
 			if(x == pacPosX && y == pacPosY) { // Pac Man
@@ -174,13 +181,13 @@ void printMap() {
 				printf("\x1B[0m");
 			} 
 			else if(x == ghosts[3].x && y == ghosts[3].y) {
-				printf("\x1B[37m"); // Rot
+				printf("\x1B[37m"); // Blau
 				printf("U "); // Geist
 				printf("\x1B[0m");
 			} 
 			else if(walls[y * width + x]) {
 				// printf("\x1B[34m" "WW" "\x1B[0m"); // Wand
-				printf("\x1B[36m" "WW" "\x1B[0m"); // Wand
+				printf("\x1B[34m" "WW" "\x1B[0m"); // Wand
 			} else if(coins[y * width + x]) {
 				printf("\x1B[33m"); // Gelb
 				printf(". "); // Coin
@@ -294,29 +301,66 @@ vec2 dirToTarget(int fromX, int fromY, int toX, int toY) {
 	return dir;
 }
 
+int dist (int x1, int y1, int x2, int y2) {
+	return sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+}
+
 void updateGhosts() {
-	// vec2 dirToPacman = 
 	ghosts[0].dir = dirToTarget(ghosts[0].x, ghosts[0].y, pacPosX, pacPosY);
+
 	ghosts[1].dir = dirToTarget(ghosts[1].x, ghosts[1].y, pacPosX+pacDirX*4, pacPosY+pacDirY*4);
 
-	vec2 pacPlus2 = { pacPosX+pacDirX * 2, pacPosY+pacDirY * 2 }; // Punkt 2 Felder vor Pacman
-	vec2 fromBlinkyToPacFront = { pacPlus2.x - ghosts[0].x, pacPlus2.y - ghosts[0].y }; // Richtung von Blinky zum Feld 2 Felder vor Pacman
-	vec2 inkyTarget = { ghosts[0].x + fromBlinkyToPacFront.x * 2, ghosts[0].y + fromBlinkyToPacFront.y * 2 };
-	ghosts[2].dir = dirToTarget(ghosts[2].x, ghosts[2].y, inkyTarget.x, inkyTarget.y);
+	if(level == 0 && score >= 30 || level > 0) {
+		vec2 pacPlus2 = { pacPosX+pacDirX * 2, pacPosY+pacDirY * 2 }; // Punkt 2 Felder vor Pacman
+		vec2 fromBlinkyToPacFront = { pacPlus2.x - ghosts[0].x, pacPlus2.y - ghosts[0].y }; // Richtung von Blinky zum Feld 2 Felder vor Pacman
+		vec2 inkyTarget = { ghosts[0].x + fromBlinkyToPacFront.x * 2, ghosts[0].y + fromBlinkyToPacFront.y * 2 };
+		ghosts[2].dir = dirToTarget(ghosts[2].x, ghosts[2].y, inkyTarget.x, inkyTarget.y);
+	}
+
+	if(level==0 && score >= 60 || level==1 && score >= 50 || level > 1) {
+		int clydeDist = dist(ghosts[3].x, ghosts[3].y, pacPosX, pacPosY);
+		if(clydeDist > 8) {
+			ghosts[3].dir = dirToTarget(ghosts[3].x, ghosts[3].y, pacPosX, pacPosY);
+		} else {
+			ghosts[3].dir = dirToTarget(ghosts[3].x, ghosts[3].y, 1, height-2); // untere linke Ecke
+		}
+	}
+
 
 	// ghosts[0].dirX = dirToPacman.x;
 	// ghosts[0].dirY = dirToPacman.y;
 	// ghosts[0].x += ghosts[0].dir.x;
 	// ghosts[0].y += ghosts[0].dir.y;
+
 	for(int i = 0; i < NUM_GHOSTS; i++) {
 		ghosts[i].x += ghosts[i].dir.x;
 		ghosts[i].y += ghosts[i].dir.y;
 	}
 }
 
+void checkGhostCollision() {
+	for(int i = 0; i < NUM_GHOSTS; i++) { // Leben abziehen bei Kollision mit Geist
+		if(ghosts[i].x == pacPosX && ghosts[i].y == pacPosY) {
+			leben--;
+			if(leben == 0) { // Tot
+				// printf("\x1B[2J"); // Erase Entire Viewport
+				state = State::ENDSCREEN;
+				break;
+			}
+			printMap();
+			loadStartPositions();
+			Platform::sleepMS(500);
+			printMap();
+			Platform::sleepMS(750);
+			break;
+		}
+	}
+}
+
 void updateGame() {
 	if(Platform::kbPressed()) { // Wenn Taste gedrueckt
 		char input = Platform::getPressedKey(); // Die gedrückte Taste
+		for(; Platform::kbPressed(); input = Platform::getPressedKey()); // Letztes Zeichen aus input Puffer auswaehlen, alle anderen entfernen
 		switch(input) {
 			case 'w':
 			case 'W':
@@ -360,33 +404,28 @@ void updateGame() {
 			coins[pacPosY * width + pacPosX] = false; // Muenze einsammeln
 			score++;
 			if(score == MAX_SCORE) {
-				printf("\x1B[2J"); // Erase Entire Viewport
-				state = State::ENDSCREEN;
+				// printf("\x1B[2J"); // Erase Entire Viewport
+
+				level++;
+				loadMap();
+				printf("\x1B[20;%dH", width - 2); // Cursor pos <y=0; x=0>
+				printf("\x1B[33m"); // Gelb
+				printf("Ready!");
+				printf("\x1B[0m"); // Farbe zuruecksetzen
+				Platform::sleepMS(1000);
+				// state = State::ENDSCREEN;
 				// GEWONNEN
 			}
 		}
 	}
 
+	checkGhostCollision();
+
 	static int tick = 0;
 	if(tick++ % 8 != 0)
 		updateGhosts();
 
-	for(int i = 0; i < NUM_GHOSTS; i++) { // Leben abziehen bei Kollision mit Geist
-		if(ghosts[i].x == pacPosX && ghosts[i].y == pacPosY) {
-			leben--;
-			if(leben == 0) { // Tot
-				// printf("\x1B[2J"); // Erase Entire Viewport
-				state = State::ENDSCREEN;
-				break;
-			}
-			printMap();
-			loadStartPositions();
-			Platform::sleepMS(500);
-			printMap();
-			Platform::sleepMS(750);
-			break;
-		}
-	}
+	checkGhostCollision();
 }
 
 void printStartScreen1() {
@@ -549,23 +588,48 @@ int main(int argc, char** argv) {
 	for(;;) {
 		switch(state) {
 			case State::ENDSCREEN:
-				// End startscreen on Keypress:
-				// if(Platform::kbPressed()) {
-				// 	Platform::getPressedKey(); // Consume key event
-				// 	state = State::GAME;
-				// 	printf("\x1B[2J"); // Erase Entire Viewport
-				// 	break;
-				// }
-				printf("\x1B[2J"); // Erase Entire Viewport
-				printf("\x1B[0;0H"); // Cursor pos <y=0; x=0>
-				printf("Das spiel ist vorbei. Ihr score war: %d\n", score);
+				{
+					printf("\x1B[2J"); // Erase Entire Viewport
+					printf("\x1B[0;0H"); // Cursor pos <y=0; x=0>
+					printf("Das spiel ist vorbei. Ihr score war: %d\n", score);
+					printf("\nBitte geben sie ihren Namen ein: ");
+					int nameLength = 0;
+					char name[128];
+					for(;;) {
+						while(!Platform::kbPressed());
+						const char cur = Platform::getPressedKey();
+
+						if(cur == ',')
+							continue;
+
+						if(cur == '\r') {
+							// printf("Highscore wird Gespeichert\n");
+							Platform::sleepMS(500);
+							FILE *const fp = fopen("Highscore.txt", "a");
+							fprintf(fp,"%s, %d, ", name, score);
+							fclose(fp);
+							state = State::MENU;
+						}
+
+						if(cur == '\b' && nameLength > 0) {
+							printf("\b \b"); // Letzten Buchstaben ueberschreiben
+							nameLength--;
+						}
+
+						if(cur != '\b' && nameLength < 126) {
+							printf("%c", cur); // Buchstaben ausdrucken
+							name[nameLength++] = cur;
+							name[nameLength] = 0;
+						}
+					}
+				}
 			break;
 
 			case State::START_SCREEN:
 				// End startscreen on Keypress:
 				if(Platform::kbPressed()) {
 					Platform::getPressedKey(); // Consume key event
-					state = State::GAME;
+					state = State::MENU;
 					printf("\x1B[2J"); // Erase Entire Viewport
 					break;
 				}
@@ -574,6 +638,93 @@ int main(int argc, char** argv) {
 				printStartScreen();
 			break;
 
+			case State::HELPPAGE:
+				system("cls");
+				printf("Die Regeln:\n\nSie steuern den Pac-Man mit WASD. ");
+				printf("Ihr Ziel ist es alle Muenzen auf dem Spielfeld einzusammeln\nohne von den Geistern gefressen zu werden. ");
+				printf("Bei Kontakt mit einem der 4 Geister verlieren sie eines von 3 Leben und\ndie Positionen aller Charaktere werden ");
+				printf("zurueckgesetzt, ihre gesammelten Muezen bleiben aber erhalten.\n");
+				printf("Verlassen sie einen der beiden Ausgaenge, werden sie auf die gegenueberliegende Seite teleportiert.\n");
+				printf("Verlieren sie alle 3 Leben ist das Spiel vorbei.\n\n");
+				printf("Blinky, der rote Geist, verfolgt sie, sobald das Spiel beginnt.\n");
+				printf("Pinky, der pinke Geist, versucht ihnen den Weg abzuschneiden.\n");
+				printf("Inky, der blaue Geist, ist fast unberechnbar, greift aber oft von hinten an.\n");
+				printf("Clyde, der orangene Geist, laeuft vor ihnen weg, sobald sie ihm zu nahe kommen.\n");
+				printf("Alle Geister bewegen sich mit 80%% der Geschwindigkeit des Pac-Man.\n\n");
+
+				while(!Platform::kbPressed()); // Auf Eingabe warten
+				Platform::getPressedKey(); // Eingabe konsumieren
+
+				state = State::MENU;
+				break;
+
+
+			case State::MENU:
+				{
+					FILE *const fp = fopen("Highscore.txt", "r");
+	
+					if(!fp) {
+						printf("Highscoredatei konnte nicht geladen werden\n");
+						Platform::sleepMS(1000);
+					}
+
+					char highName[128];
+					int highScore = -1;
+
+					for(;;) {
+						char name[128];
+						int score;
+
+						if(fscanf(fp, "%[^,], %d, ", name, &score) != 2)
+							break;
+
+						if(score > highScore || highScore == -1) {
+							memcpy(highName, name, 128);
+							highScore = score;
+						}
+					}
+					fclose(fp);
+
+
+					system("cls");
+
+					printf("Highscore: \"%s\" %d\n", highName, highScore);
+
+					printf("Pac-Man\n");
+					printf("1 = Spiel starten\n");
+					printf("2 = Regeln und Steuerung\n");
+					printf("3 = Beenden\n\n");
+
+					printf("Ihre Eingabe: ");
+
+					// int option=1;
+					// scanf("%d",&option);
+					while(!Platform::kbPressed());
+					char option = Platform::getPressedKey() - '0';
+
+					switch(option) {
+						case 1:
+							system("cls");
+							printf("Das Spiel beginnt!");
+							Platform::sleepMS(500);
+							printf("\x1B[2J"); // Erase Entire Viewport
+							state = State::GAME;
+							level = 0;
+							break;
+
+						case 2:
+							state = State::HELPPAGE;
+							break;
+
+						case 3:
+							return 0;
+
+						default:
+							printf("1,2 oder 3\n\n");
+							break;
+					}
+				}
+				break;
 
 			case State::GAME:
 				// Logic
