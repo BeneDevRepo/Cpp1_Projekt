@@ -72,7 +72,7 @@ namespace Platform {
 		#endif
 	}
 
-	void sleepMS(uint32_t ms) { // Delay in Millisekunden
+	void sleepMS(const uint32_t ms) { // Delay in Millisekunden
 		#if _WIN32
 			Sleep(ms);
 		#endif
