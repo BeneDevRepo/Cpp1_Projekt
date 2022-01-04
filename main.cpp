@@ -4,11 +4,12 @@
 #include <cstdlib>
 #include <ctime>
 
+#include <memory.h>
+
 #include <vector>
 
 #include "platform.h" // Plattform-spezifischer Code
 #include "map.h" // Pacman-Level
-#include "startscreens.h" // startbildschirme
 
 // 2D - Vektor fuer Positionen u. Richtungen:
 struct vec2 {
@@ -110,10 +111,10 @@ void printMap() {
 
 	printf("\x1B[?25l"); // Konsolen-Cursor deaktivieren
 	printf("\x1B[0;0H"); // Cursor pos <y=0; x=0>
-	// printf("\x1B[2J"); // Gesamte Konsole leeren
 
 	printf("Level %d\n\n", level + 1);
 
+    printf("\x1B[40m"); // Hintergrund schwarz
 	for(int y = 0; y < height; y++) {
 		for(int x = 0; x < width; x++) {
 			if(x == pacPos.x && y == pacPos.y) { // Pac Man
@@ -131,40 +132,44 @@ void printMap() {
 					else if(pacDir.y == -1)
 						printf("V ");
 				}
-				printf("\x1B[0m");
+				// printf("\x1B[0m");
 			}
 			else if(x == ghosts[0].pos.x && y == ghosts[0].pos.y) {
 				printf("\x1B[31m"); // Rot
 				printf("U "); // Geist
-				printf("\x1B[0m");
+				// printf("\x1B[0m");
 			} 
 			else if(x == ghosts[1].pos.x && y == ghosts[1].pos.y) {
 				printf("\x1B[95m"); // Pink
 				printf("U "); // Geist
-				printf("\x1B[0m");
+				// printf("\x1B[0m");
 			} 
 			else if(x == ghosts[2].pos.x && y == ghosts[2].pos.y) {
 				printf("\x1B[36m"); // Tuerkis / Cyan
 				printf("U "); // Geist
-				printf("\x1B[0m");
+				// printf("\x1B[0m");
 			} 
 			else if(x == ghosts[3].pos.x && y == ghosts[3].pos.y) {
 				printf("\x1B[37m"); // Blau
 				printf("U "); // Geist
-				printf("\x1B[0m");
+				// printf("\x1B[0m");
 			} 
 			else if(walls[y * width + x]) {
-				printf("\x1B[34m" "WW" "\x1B[0m"); // Wand
+				printf("\x1B[34m"); // Blau
+                printf("WW"); // Wand
+                // printf("\x1B[0m");
 			} else if(coins[y * width + x]) {
 				printf("\x1B[33m"); // Gelb
 				printf(". "); // Muenze
-				printf("\x1B[0m");
+				// printf("\x1B[0m");
 			} else {
 				printf("  "); // Leer
 			}
 		}
 		printf("\n");
 	}
+
+    printf("\x1B[0m");
 
 	printf("\x1B[35m" "\nScore: %d\n" "\x1B[0m", score);
 
@@ -185,7 +190,7 @@ vec2 dirToTarget(int fromX, int fromY, int toX, int toY) {
 	if(toY >= 0 && toY < height && toX >= 0 && toX < width && walls[toY * width + toX] == false) {
 		lastSet.push_back({toX, toY});
 	} else { // falls Zielposition in einer Wand oder ausserhalb des Spielfeldes liegt:
-		for(; lastSet.size() == 0; currentDist++) { 
+		for(; lastSet.size() == 0; currentDist++) {
 			for(int xRel = -currentDist; xRel <= currentDist; xRel++) {
 				for(int yFac = -1; yFac <= 1; yFac += 2) {
 					const int x = toX + xRel;
@@ -274,9 +279,11 @@ int dist (int x1, int y1, int x2, int y2) {
 }
 
 void updateGhosts() {
-	ghosts[0].dir = dirToTarget(ghosts[0].pos.x, ghosts[0].pos.y, pacPos.x, pacPos.y); // Blinky
+	// Blinky:
+	ghosts[0].dir = dirToTarget(ghosts[0].pos.x, ghosts[0].pos.y, pacPos.x, pacPos.y);
 
-	ghosts[1].dir = dirToTarget(ghosts[1].pos.x, ghosts[1].pos.y, pacPos.x + pacDir.x*4, pacPos.y + pacDir.y*4); // Pinky
+	// Pinky:
+	ghosts[1].dir = dirToTarget(ghosts[1].pos.x, ghosts[1].pos.y, pacPos.x + pacDir.x*4, pacPos.y + pacDir.y*4);
 
 	// Inky:
 	if(level == 0 && score >= 30 || level > 0) {
@@ -429,22 +436,23 @@ void storeScore() {
 		if(cur == ',') continue; // Aufgrund des Dateiformats sind Kommas im Namen unzulaessig
 
 		// Name wird durch 'Enter' bestaetigt:
-		if(cur == '\r' || cur == '\n') {
+		if(cur == '\r' || cur == '\n' && nameLength > 0) {
 			name[nameLength] = 0; // Null-Terminator an name anfuegen
 			FILE *const fp = fopen("Highscore.txt", "a");
 			fprintf(fp,"%s, %d, ", name, score);
 			fclose(fp);
-			state = State::MENU;
-			break;
+			return;
 		}
 
-		if(cur == '\b' && nameLength > 0) {
+		if((cur == '\b' || cur == 127) && nameLength > 0) {
 			printf("\b \b"); // Letzten Buchstaben aus Konsole loeschen
+            fflush(stdout); // Weil linux
 			nameLength--;
 		}
 
-		if(cur != '\b' && nameLength < NAME_BUFFER_SIZE-1) {
+		if((cur != '\b' && cur != 127) && nameLength < NAME_BUFFER_SIZE-1) {
 			printf("%c", cur); // Buchstaben ausdrucken
+            fflush(stdout); // Weil linux
 			name[nameLength++] = cur;
 		}
 	}
@@ -461,20 +469,23 @@ int main(int argc, char** argv) {
 	for(;;) {
 		switch(state) {
 			case State::ENDSCREEN:
-				// printf("\x1B[2J"); // Gesamte konsole leeren
 				printf("\x1B[0;0H"); // Cursor pos <y=0; x=0>
-				printf("Das spiel ist vorbei. Ihr score war: %d\n", score);
-				printf("\nBitte geben sie ihren Namen ein: ");
+				printf("Das spiel ist vorbei. Ihr score war: %d\n\n", score);
+                printf("Bitte geben sie ihren Namen ein: ");
+                fflush(stdout); // Weil linux
 
 				storeScore(); // Nutzernamen abfragen u. Score + Namen in Datei speichern
 
 				freeMap(); // Speicher des Spielfeldes freigeben
+
+                state = State::MENU;
 			break;
 
 			case State::START_SCREEN:
 				// Startbildschirm nach Tastatureingabe beenden:
 				if(Platform::kbPressed()) {
-					Platform::getPressedKey(); // Taste aus Inputpuffer konsumieren
+					char tmp = Platform::getPressedKey(); // Taste aus Inputpuffer konsumieren
+                    // printf("%d", tmp);
 					printf("\x1B[2J"); // Gesamte Konsole leeren
 					state = State::MENU;
 					break;
@@ -515,11 +526,13 @@ int main(int argc, char** argv) {
 
 			case State::MENU:
 				{
-					FILE *const fp = fopen("Highscore.txt", "r");
+					FILE *fp = fopen("Highscore.txt", "r");
 	
 					if(!fp) {
-						printf("Highscoredatei konnte nicht geladen werden\n");
-						Platform::sleepMS(1000);
+                        fp = fopen("Highscore.txt", "w"); // Highscore datei erstellen falls sie nicht existiert
+                        fclose(fp);
+
+						fp = fopen("Highscore.txt", "r");
 					}
 
 					char highName[128];
@@ -542,14 +555,13 @@ int main(int argc, char** argv) {
 					printf("\x1B[2J"); // Gesamte Konsole leeren
 					printf("\x1B[0;0H"); // Cursor pos <y=0; x=0>
 
-					printf("Highscore: \"%s\" %d\n", highName, highScore);
+                    if(highScore != -1)
+					    printf("Highscore: \"%s\" %d\n", highName, highScore);
 
 					printf("Pac-Man\n");
 					printf("1 = Spiel starten\n");
 					printf("2 = Regeln und Steuerung\n");
-					printf("3 = Beenden\n\n");
-
-					printf("Ihre Eingabe: ");
+					printf("3 = Beenden\n");
 
 					while(!Platform::kbPressed());
 					int option = Platform::getPressedKey() - '0';
@@ -591,7 +603,7 @@ int main(int argc, char** argv) {
 				printMap();
 
 				// Delay
-				Platform::sleepMS(100);
+				Platform::sleepMS(300);
 			break;
 		}
 	}
