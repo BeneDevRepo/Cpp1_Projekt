@@ -182,95 +182,128 @@ void printMap() {
 
 // berechnet die optimale Richtung um von Punkt 'from' nach 'to' zu gelangen:
 vec2 dirToTarget(int fromX, int fromY, int toX, int toY) {
-	int *const distMap = new int[width * height]{};
+	int *const distMap = new int[width * height]{}; // Array mit Distanzen zur Zielposition
 
-	int currentDist = 1; // Distanz zur Zielposition
 	std::vector<vec2> lastSet; // zuletzt ausgefuellte Felder
 
-	if(toY >= 0 && toY < height && toX >= 0 && toX < width && walls[toY * width + toX] == false) {
-		lastSet.push_back({toX, toY});
+	// Startpositionen fuer A* - Ausbreitung finden:
+	if(toY >= 0 && toY < height && toX >= 0 && toX < width && walls[toY * width + toX] == false) { // falls Zielposition betretbar ist
+		lastSet.push_back({toX, toY}); // Zielposition als Startposition fuer A*-Algorithmus auswaehlen; der Eintrag in distMap wird nach der Propagationsphase vorgenommen.
 	} else { // falls Zielposition in einer Wand oder ausserhalb des Spielfeldes liegt:
-		for(; lastSet.size() == 0; currentDist++) {
+		
+		// mit Manhattan-Distanz 1 starten und solange distanz erhoehen bis mindestens eine A*-Startposition gefunden wurde:
+		for(int currentDist = 1; lastSet.size() == 0; currentDist++) {
+
+			// Isolinie (alle Punkte mit gleichem Wert) aller Punkte mit manhattan-Distanz <currentDist> zu (toX|toY) von links nach rechts durchgehen: (Rautenform)
 			for(int xRel = -currentDist; xRel <= currentDist; xRel++) {
+
+				// Erst oberen, dann unteren Punkt der Raute an x = xRel testen:
 				for(int yFac = -1; yFac <= 1; yFac += 2) {
+
+					// Absolute Koordinaten im Spielfeld ausrechnen:
 					const int x = toX + xRel;
 					const int y = toY + yFac * (currentDist - abs(xRel));
 
-					if(x < 0 || x > width-1 || y < 0 || y > height-1) // Punkte ausserhalb des spielfeldes ueberspringen
+					// Punkte ausserhalb des spielfeldes ueberspringen:
+					if(x < 0 || x > width-1 || y < 0 || y > height-1) 
 						continue;
 
-					if(walls[y * width + x]) // Waende ueberspringen
+					// Waende ueberspringen:
+					if(walls[y * width + x]) 
 						continue;
 
-					distMap[y * width + x] = currentDist;
-					lastSet.push_back({x, y});
+					distMap[y * width + x] = currentDist; // Distanz in distMap eintragen
+					lastSet.push_back({x, y}); // Punkt zu Menge der Startpunkte fuer A* hinzufuegen
+
+					// Wenn ein valider startpunkt erkannt wurde, werden danach noch alle weiteren Punkte gleicher Distanz getestet und ggf. ausgewaehlt,
+					// danach wird die Suche nach Startpunkten dann abgebrochen.
 				}
 			}
 		}
 	}
 
+	// Von den Markierten Startpunkten aus wellenartig ausbreiten, alle infrage kommenden benachbarten Punkte mit erhoehter Distanz fuellen
+	// und die neu gefuellten Punkte zur Startmenge im naechsten Durchlauf machen:
 	for(;;) {
-		std::vector<vec2> newLastSet;
+		std::vector<vec2> newLastSet; // die Menge der in diesem Durchgang markierten Punkte; im naechsten Durchgang sind dies die Startpunkte.
 
-		for(int i=0; i < lastSet.size(); i++) {
-			if(walls[lastSet[i].y * width + lastSet[i].x-1] == false && distMap[lastSet[i].y * width + lastSet[i].x-1] == 0) { // Keine Wand links
-				distMap[lastSet[i].y * width + lastSet[i].x-1] = currentDist;
-				newLastSet.push_back({lastSet[i].x-1, lastSet[i].y});
+		// Durch die Menge aller Startpunkte (Wellenfront) dieses Durchgangs iterieren:
+		for(int i = 0; i < lastSet.size(); i++) {
+			const vec2 p = lastSet[i];
+
+			const int currentDist = distMap[p.y * width + p.x] + 1; // die Distanz der infrage kommenden Nachbarfelder um das aktuelle Feld herum ist 1 hoeher als die distanz des aktuellen Feldes zum Ziel
+
+			// Fuer alle 4 Richtungen:
+			// 1. Testen ob Feld in die Richtung innerhalb des Spielfeldes liegt
+			// 2. Testen ob das Feld keine Wand ist
+			// 3. Testen ob das Feld noch frei ist, um keine bereits beschriebenen Felder zu ueberschreiben
+			// Falls alle Bedingungen zutreffen:
+			//	1. Feld mit neuer Distanz fuellen
+			//	2. Feld zur menge der in diesem Durchlauf gefuellten Felder hinzufuegen
+
+			if(p.x-1 >= 0 && walls[p.y * width + p.x-1] == false && distMap[p.y * width + p.x-1] == 0) { // Keine Wand links
+				distMap[p.y * width + p.x-1] = currentDist; // Feld mit Distanz fuellen
+				newLastSet.push_back({p.x-1, p.y}); // Feld zur menge der in diesem Durchlauf gefuellten Felder hinzufuegen
 			}
-			if(walls[lastSet[i].y * width + lastSet[i].x+1] == false && distMap[lastSet[i].y * width + lastSet[i].x+1] == 0) { // Keine Wand rechts
-				distMap[lastSet[i].y * width + lastSet[i].x+1] = currentDist;
-				newLastSet.push_back({lastSet[i].x+1, lastSet[i].y});
+
+			if(p.x+1 <= width-1 && walls[p.y * width + p.x+1] == false && distMap[p.y * width + p.x+1] == 0) { // Keine Wand rechts
+				distMap[p.y * width + p.x+1] = currentDist; // Feld mit Distanz fuellen
+				newLastSet.push_back({p.x+1, p.y}); // Feld zur menge der in diesem Durchlauf gefuellten Felder hinzufuegen
 			}
-			if(walls[(lastSet[i].y-1) * width + lastSet[i].x] == false && distMap[(lastSet[i].y-1) * width + lastSet[i].x] == 0) { // Keine Wand oben
-				distMap[(lastSet[i].y-1) * width + lastSet[i].x] = currentDist;
-				newLastSet.push_back({lastSet[i].x, lastSet[i].y-1});
+
+			if(p.y-1 >= 0 && walls[(p.y-1) * width + p.x] == false && distMap[(p.y-1) * width + p.x] == 0) { // Keine Wand oben
+				distMap[(p.y-1) * width + p.x] = currentDist; // Feld mit Distanz fuellen
+				newLastSet.push_back({p.x, p.y-1}); // Feld zur menge der in diesem Durchlauf gefuellten Felder hinzufuegen
 			}
-			if(walls[(lastSet[i].y+1) * width + lastSet[i].x] == false && distMap[(lastSet[i].y+1) * width + lastSet[i].x] == 0) { // Keine Wand unten
-				distMap[(lastSet[i].y+1) * width + lastSet[i].x] = currentDist;
-				newLastSet.push_back({lastSet[i].x, lastSet[i].y+1});
+
+			if(p.y+1 <= height-1 && walls[(p.y+1) * width + p.x] == false && distMap[(p.y+1) * width + p.x] == 0) { // Keine Wand unten
+				distMap[(p.y+1) * width + p.x] = currentDist; // Feld mit Distanz fuellen
+				newLastSet.push_back({p.x, p.y+1}); // Feld zur menge der in diesem Durchlauf gefuellten Felder hinzufuegen
 			}
 		}
 
-		currentDist++;
-
-		if(newLastSet.size() == 0)
+		if(newLastSet.size() == 0) // Wenn im gesamten Durchgang kein einziges Feld gefuellt ist, dann ist die Distanzkarte fertig.
 			break;
 
-		lastSet = newLastSet;
+		lastSet = newLastSet; // die Menge der neu gefuellten Punkte zur Startmenge des naechsten Durchlaufs machen
 	}
 
-	// falls moeglich Distanz unter Pacman auf 0 setzen:
+	// falls moeglich Distanz an Zielposition auf 0 setzen:
 	if(toY >= 0 && toY < height && toX >= 0 && toX < width)
 		if(walls[toY * width + toX] == false)
 			distMap[toY * width + toX] = 0;
 
+	// Distanzen in allen 4 Richtungen der Startposition vergleichen und kleinste Distanz als optimale Richtung zum Ziel zurueckgeben:
 	vec2 dir; // Resultat (optimale richtung zum Zielpunkt)
-	int minDist = 1000000;
+	int minDist = 1000000; // kleinste bisher gefundene Distanz (startwert hoeher alls alle realistisch zu erwartenden Distanzen in distMap)
 
-	if(distMap[fromY * width + fromX-1] < minDist && walls[fromY * width + fromX-1] == false) {
-		minDist = distMap[fromY * width + fromX-1];
-		dir.x = -1;
-		dir.y = 0;
+	// fuer alle 4 Richtungen:
+	// 1. testen ob Feld in die Richtung innerhalb des Spielfeldes liegt
+	// 2. testen ob distanz zum ziel in die Richtung kleiner ist als alle bisherigen gefundenen Distanzen
+	// 3. testen ob Feld in die Richtung keine Wand ist
+	// Falls alle 3 Bedingungen erfuellt sind:
+	//	1. minimale bisher gefundene distanz mit distanz des Feldes in die Richtung ueberschreiben
+	//	2. Richtung der minimalen bisher gefundenen Distanz mit gerade ueberpruefter Richtung ueberschreiben
+	if(fromX-1 >= 0 && distMap[fromY * width + fromX-1] < minDist && walls[fromY * width + fromX-1] == false) { // links
+		minDist = distMap[fromY * width + fromX-1]; // kleinste bisher gefundene Distanz anpassen
+		dir = {-1, 0}; // optimalste bisher gefundene Richtung ueberschreiben
 	}
-	if(distMap[fromY * width + fromX+1] < minDist && walls[fromY * width + fromX+1] == false) {
-		minDist = distMap[fromY * width + fromX+1];
-		dir.x = 1;
-		dir.y = 0;
+	if(fromX+1 <= width-1 && distMap[fromY * width + fromX+1] < minDist && walls[fromY * width + fromX+1] == false) { // rechts
+		minDist = distMap[fromY * width + fromX+1]; // kleinste bisher gefundene Distanz anpassen
+		dir = {1, 0}; // optimalste bisher gefundene Richtung ueberschreiben
 	}
-	if(distMap[(fromY-1) * width + fromX] < minDist && walls[(fromY-1) * width + fromX] == false) {
-		minDist = distMap[(fromY-1) * width + fromX];
-		dir.x = 0;
-		dir.y = -1;
+	if(fromY-1 >= 0 && distMap[(fromY-1) * width + fromX] < minDist && walls[(fromY-1) * width + fromX] == false) { // oben
+		minDist = distMap[(fromY-1) * width + fromX]; // kleinste bisher gefundene Distanz anpassen
+		dir = {0, -1}; // optimalste bisher gefundene Richtung ueberschreiben
 	}
-	if(distMap[(fromY+1) * width + fromX] < minDist && walls[(fromY+1) * width + fromX] == false) {
-		minDist = distMap[(fromY+1) * width + fromX];
-		dir.x = 0;
-		dir.y = 1;
+	if(fromY+1 <= height-1 && distMap[(fromY+1) * width + fromX] < minDist && walls[(fromY+1) * width + fromX] == false) { // unten
+		minDist = distMap[(fromY+1) * width + fromX]; // kleinste bisher gefundene Distanz anpassen
+		dir = {0, 1}; // optimalste bisher gefundene Richtung ueberschreiben
 	}
 
-	delete[] distMap;
+	delete[] distMap; // Speicher von distMap freigeben 
 
-	return dir;
+	return dir; // optimale Richtung zum Ziel zurueckgeben
 }
 
 // Kartesische Distanz nach Satz des Pythagoras:
@@ -289,7 +322,7 @@ void updateGhosts() {
 	if(level == 0 && score >= 30 || level > 0) {
 		vec2 pacPlus2 = { pacPos.x+pacDir.x * 2, pacPos.y+pacDir.y * 2 }; // Punkt 2 Felder vor Pacman
 		vec2 fromBlinkyToPacFront = { pacPlus2.x - ghosts[0].pos.x, pacPlus2.y - ghosts[0].pos.y }; // Richtung von Blinky zum Feld 2 Felder vor Pacman
-		vec2 inkyTarget = { ghosts[0].pos.x + fromBlinkyToPacFront.x * 2, ghosts[0].pos.y + fromBlinkyToPacFront.y * 2 };
+		vec2 inkyTarget = { ghosts[0].pos.x + fromBlinkyToPacFront.x * 2, ghosts[0].pos.y + fromBlinkyToPacFront.y * 2 }; // Zielposition fuer Inky
 		ghosts[2].dir = dirToTarget(ghosts[2].pos.x, ghosts[2].pos.y, inkyTarget.x, inkyTarget.y);
 	}
 
@@ -366,15 +399,18 @@ void updateGame() {
 		}
 	}
 
+	// Pacmans naechste Position berechnen:
 	int nextX = pacPos.x + pacDir.x;
 	int nextY = pacPos.y + pacDir.y;
 
+	// Pacman an Portalen auf andere Seite bewegen:
 	if(nextX == -1)
 		nextX += width;
 	if(nextX == width)
 		nextX -= width;
 
 	if(walls[nextY * width + nextX] == false) { // Wenn an Zielposition keine Wand
+		// Pacman bewegen:
 		pacPos.x = nextX;
 		pacPos.y = nextY;
 
@@ -403,10 +439,10 @@ void updateGame() {
 		return; // Verhindert dass pacman in 1 Frame 2 Leben verlieren kann
 
 	static int tick = 0;
-	if(tick++ % 8 != 0)
+	if(tick++ % 8 != 0) // Geister ueberspringen jeden 8. Frame
 		updateGhosts();
 
-	manageGhostCollision();
+	manageGhostCollision(); // Kollision mit Geistern ein 2. Mal pruefen, damit Pacman nicht durch Geister hindurchlaufen kann
 }
 
 // Druckt startbildschirm:
