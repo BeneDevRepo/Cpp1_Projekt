@@ -1,3 +1,9 @@
+/* 
+ * Datum: 7.1.2022
+ * Autoren: Martin schmidt, Benedikt Binger, Hendrik Lange
+ */
+
+
 #include <cstdio>
 #include <cmath>
 

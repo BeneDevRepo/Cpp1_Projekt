@@ -1,3 +1,8 @@
+/* 
+ * Datum: 7.1.2022
+ * Autoren: Martin schmidt, Benedikt Binger, Hendrik Lange
+ */
+
 namespace testMap {
 	const int WIDTH = 28;
 	const int HEIGHT = 31;

@@ -1,3 +1,8 @@
+/* 
+ * Datum: 7.1.2022
+ * Autor: Benedikt Binger
+ */
+
 #pragma once
 
 #include <cstdio>
