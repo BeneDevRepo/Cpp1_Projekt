@@ -31,8 +31,10 @@ namespace Platform {
 	void configTerminal() { // Wird 1 mal in main aufgerufen um die Konsole vorzubereiten
 		#if _WIN32
 			CONSOLE_CURSOR_INFO cursorInfo;
+
 			cursorInfo.dwSize = 1; // curser-hoehe auf Minimum setzen
 			cursorInfo.bVisible = FALSE; // cursor deaktivieren
+
 			SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cursorInfo); // Cursor-Einstellungen speichern
 		#endif
 

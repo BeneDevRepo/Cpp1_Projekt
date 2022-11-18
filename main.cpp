@@ -424,11 +424,13 @@ void updateGame() {
 			coins[pacPos.y * width + pacPos.x] = false; // Muenze einsammeln
 			score++;
 
-			if(score == MAX_SCORE) { // Level gewonnen
+			if(score >= MAX_SCORE) { // Level gewonnen
 				// printf("\x1B[2J"); // Gesamte Konsole leeren
 
 				level++;
 				resetPositions();
+				freeMap();
+				loadMap();
 
 				printf("\x1B[20;%dH", width - 2); // Cursor pos <y=0; x=0>
 				printf("\x1B[33m"); // Gelb
